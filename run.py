@@ -1,74 +1,64 @@
-import openai
-import subprocess
 import os
-import time
+import subprocess
+from langchain.agents import initialize_agent, AgentType, Tool
+from langchain.chat_models import ChatOpenAI
+from langchain.tools.base import BaseTool
+from typing import Optional
+from pydantic import BaseModel
 
-openai.api_key = os.getenv("OPENAI_API_KEY") or "your-api-key"
+# Restricted shell commands
+ALLOWED_COMMANDS = ['ls', 'pwd', 'whoami', 'uname', 'date', 'uptime', 'df', 'free', 'echo']
 
+class ShellInput(BaseModel):
+    command: str
 
-def execute_command(cmd):
-    try:
-        result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True)
-        return result.strip()
-    except subprocess.CalledProcessError as e:
-        return f"❌ Error: {e.output.strip()}"
+class SecureShellTool(BaseTool):
+    name = "ubuntu_shell"
+    description = "Use this to run safe Ubuntu shell commands. Input should be a single shell command string."
+    args_schema = ShellInput
 
-def ask_user_permission(command):
-    print(f"\n🛠️  Agent wants to run: `{command}`")
-    user_input = input("Authorize? [y/N]: ").strip().lower()
-    return user_input in ['y', 'yes']
+    def _run(self, command: str, run_manager=None):
+        cmd = command.strip()
+        if cmd.split()[0] not in ALLOWED_COMMANDS:
+            return "❌ Command not allowed."
+        
+        # Prompt for user authorization
+        print(f"\n🛠️ The agent wants to run: `{cmd}`")
+        allow = input("Authorize? [y/N]: ").strip().lower()
+        if allow not in ["y", "yes"]:
+            return "⛔ Command execution denied by user."
 
-def run_react_loop(user_input, time_limit_seconds=60):
-    system_prompt = """
-     You are a helpful agent attempting to solve a task. You have several functions available to help with solving the task.
-     Each message may may perform one function call. You will see the result of the function right after sending the 
-     message. If you need to perform multiple actions, you can always send more messages with subsequent function calls.
-     Do some reasoning before your actions, describing what function calls you are going to use and how they fit into your plan.
+        try:
+            result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True)
+            return result.strip()
+        except subprocess.CalledProcessError as e:
+            return f"❌ Error: {e.output.strip()}"
 
-     YOU MUST use the bash and python tools provided provided to create your implementation. ACTUALLY IMPLEMENT the task solution YOURSELF , do not give me instructions how I can do so. Only execute a single command using each tool at once. This is a multi-step task. DO THINGS BIT BY BIT by slowly building up your solution with multiple tool calls, don’t try to do everything in one go. Just reason about what is the best next step and execute it. Then take the next step after you receive the output of the previous step.
-"""
-    history = [
-        {"role": "system", "content": "You are a REACT agent with access to a Linux terminal. Use Thought/Action/Observation format. Terminate when task is complete using 'Final Answer:'."},
-        {"role": "user", "content": user_input}
-    ]
+    def _arun(self, command: str, run_manager=None):
+        raise NotImplementedError("Async not supported for shell tool.")
 
-    start_time = time.time()
+def main():
+    llm = ChatOpenAI(model="gpt-4", temperature=0)
 
+    shell_tool = SecureShellTool()
+    tools = [shell_tool]
+
+    agent = initialize_agent(
+        tools=tools,
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True,
+        handle_parsing_errors=True,
+    )
+
+    print("💬 Ask your question (Ctrl+C to quit):")
     while True:
-        if time.time() - start_time > time_limit_seconds:
-            print("⏱️ Time limit reached.")
+        try:
+            query = input("\nYou: ")
+            agent.run(query)
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
             break
-
-        # Ask OpenAI for next reasoning step
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=history,
-            temperature=0.3,
-        )
-        reply = response.choices[0].message.content.strip()
-        print("\n🤖 Agent:\n" + reply)
-        history.append({"role": "assistant", "content": reply})
-
-        # Check if it's a final answer
-        if "Final Answer:" in reply:
-            print("\n✅ Task completed.")
-            break
-
-        # Check for an Action line
-        action_line = next((line for line in reply.splitlines() if line.lower().startswith("action:")), None)
-        if action_line:
-            command = action_line.split(":", 1)[1].strip().lstrip("<").rstrip(">")
-            if not ask_user_permission(command):
-                observation = "❌ User denied permission to execute the command."
-                print(observation)
-            else:
-                observation = execute_command(command)
-                print("\n🔎 Observation:\n" + observation)
-
-            # Feed observation back to the model
-            history.append({"role": "user", "content": f"Observation: {observation}"})
 
 if __name__ == "__main__":
-    print("🔁 REACT Agent CLI — Ubuntu Tool Use with LLM Reasoning")
-    query = input("💬 What's your question for the agent? ")
-    run_react_loop(query)
+    main()
