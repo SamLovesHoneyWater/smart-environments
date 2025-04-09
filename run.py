@@ -12,8 +12,8 @@ class ShellInput(BaseModel):
     user_input: Optional[str] = None  # user can pass Y/N or other input if known
 
 class SmartShellTool(BaseTool):
-    name = "ubuntu_shell"
-    description = (
+    name: str = "ubuntu_shell"
+    description: str = (
         "Executes Ubuntu shell commands. Prompts the user if input is required. "
         "Supports interactive prompts like Y/N by passing stdin input."
     )
