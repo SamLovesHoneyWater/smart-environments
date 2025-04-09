@@ -1,6 +1,7 @@
 from langchain.agents import initialize_agent, AgentType
 from langchain.chat_models import ChatOpenAI
 from langchain_community.tools.shell.tool import ShellTool
+from langchain.memory import ConversationBufferMemory
 
 # Wrap with authorization logic
 class SafeShellTool(ShellTool):
@@ -19,10 +20,12 @@ class SafeShellTool(ShellTool):
 def main():
     llm = ChatOpenAI(model="gpt-4", temperature=0)
     shell_tool = SafeShellTool()
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     agent = initialize_agent(
         tools=[shell_tool],
         llm=llm,
         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        memory=memory,
         verbose=True,
         handle_parsing_errors=True
     )
