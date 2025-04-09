@@ -23,7 +23,8 @@ def main():
         tools=[shell_tool],
         llm=llm,
         agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True
+        verbose=True,
+        handle_parsing_errors=True
     )
 
     while True:
