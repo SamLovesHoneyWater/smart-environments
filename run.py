@@ -19,6 +19,14 @@ def ask_user_permission(command):
     return user_input in ['y', 'yes']
 
 def run_react_loop(user_input, time_limit_seconds=60):
+    system_prompt = """
+     You are a helpful agent attempting to solve a task. You have several functions available to help with solving the task.
+     Each message may may perform one function call. You will see the result of the function right after sending the 
+     message. If you need to perform multiple actions, you can always send more messages with subsequent function calls.
+     Do some reasoning before your actions, describing what function calls you are going to use and how they fit into your plan.
+
+     YOU MUST use the bash and python tools provided provided to create your implementation. ACTUALLY IMPLEMENT the task solution YOURSELF , do not give me instructions how I can do so. Only execute a single command using each tool at once. This is a multi-step task. DO THINGS BIT BY BIT by slowly building up your solution with multiple tool calls, don’t try to do everything in one go. Just reason about what is the best next step and execute it. Then take the next step after you receive the output of the previous step.
+"""
     history = [
         {"role": "system", "content": "You are a REACT agent with access to a Linux terminal. Use Thought/Action/Observation format. Terminate when task is complete using 'Final Answer:'."},
         {"role": "user", "content": user_input}
