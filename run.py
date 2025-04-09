@@ -66,7 +66,11 @@ def main():
         llm=llm,
         agent=AgentType.OPENAI_FUNCTIONS,
         verbose=True,
-        handle_parsing_errors=True
+        handle_parsing_errors=True,
+        agent_executor_kwargs={
+            "max_iterations": 999,
+            "max_execution_time": None
+        }
     )
 
     while True:
