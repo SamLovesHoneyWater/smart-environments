@@ -64,7 +64,7 @@ def main():
     agent = initialize_agent(
         tools=[shell_tool],
         llm=llm,
-        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        agent=AgentType.OPENAI_FUNCTIONS,
         verbose=True,
         handle_parsing_errors=True
     )
