@@ -27,14 +27,10 @@ def main():
         handle_parsing_errors=True
     )
 
-    chat_history = []
-
     while True:
         try:
             query = input("\n💬 Ask the agent: ")
-            chat_history.append({"role": "user", "content": query})
-            result = agent.run(input=query, chat_history=chat_history)
-            chat_history.append({"role": "assistant", "content": result})
+            result = agent.run(query)
             print("\n🧠 Final Answer:", result)
         except KeyboardInterrupt:
             print("\n👋 Exiting...")
