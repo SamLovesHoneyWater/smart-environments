@@ -1,58 +1,66 @@
-import subprocess
 import openai
+import subprocess
 import os
+import time
 
-# Set your OpenAI API key (you can also use environment variable OPENAI_API_KEY)
 openai.api_key = os.getenv("OPENAI_API_KEY") or "your-api-key"
 
-# Safety: allow only safe commands
-ALLOWED_COMMANDS = ['ls', 'pwd', 'whoami', 'uname', 'date', 'uptime', 'df', 'free', 'echo']
-
-def is_safe_command(cmd):
-    return cmd.split()[0] in ALLOWED_COMMANDS
 
 def execute_command(cmd):
-    if not is_safe_command(cmd):
-        return "⚠️ Command not allowed."
     try:
         result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, text=True)
         return result.strip()
     except subprocess.CalledProcessError as e:
         return f"❌ Error: {e.output.strip()}"
 
-def react_agent(user_input):
-    prompt = f"""
-You are a REACT agent with access to a Linux command line.
-You must think step-by-step and use the terminal only when needed.
+def ask_user_permission(command):
+    print(f"\n🛠️  Agent wants to run: `{command}`")
+    user_input = input("Authorize? [y/N]: ").strip().lower()
+    return user_input in ['y', 'yes']
 
-Use this format:
+def run_react_loop(user_input, time_limit_seconds=60):
+    history = [
+        {"role": "system", "content": "You are a REACT agent with access to a Linux terminal. Use Thought/Action/Observation format. Terminate when task is complete using 'Final Answer:'."},
+        {"role": "user", "content": user_input}
+    ]
 
-Thought: ...
-Action: <ubuntu shell command>
-Observation: ...
+    start_time = time.time()
 
-Now handle this user query: "{user_input}"
-"""
-    response = openai.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "system", "content": "You are a helpful assistant with terminal access."},
-                  {"role": "user", "content": prompt}],
-        temperature=0.2
-    )
+    while True:
+        if time.time() - start_time > time_limit_seconds:
+            print("⏱️ Time limit reached.")
+            break
 
-    output = response.choices[0].message.content
-    print("\nAgent Output:\n", output)
+        # Ask OpenAI for next reasoning step
+        response = openai.chat.completions.create(
+            model="gpt-4",
+            messages=history,
+            temperature=0.3,
+        )
+        reply = response.choices[0].message.content.strip()
+        print("\n🤖 Agent:\n" + reply)
+        history.append({"role": "assistant", "content": reply})
 
-    for line in output.splitlines():
-        if line.lower().startswith("action:"):
-            cmd = line.split(":", 1)[1].strip().lstrip("<").rstrip(">")
-            obs = execute_command(cmd)
-            print("\nObservation:\n", obs)
-            return
+        # Check if it's a final answer
+        if "Final Answer:" in reply:
+            print("\n✅ Task completed.")
+            break
+
+        # Check for an Action line
+        action_line = next((line for line in reply.splitlines() if line.lower().startswith("action:")), None)
+        if action_line:
+            command = action_line.split(":", 1)[1].strip().lstrip("<").rstrip(">")
+            if not ask_user_permission(command):
+                observation = "❌ User denied permission to execute the command."
+                print(observation)
+            else:
+                observation = execute_command(command)
+                print("\n🔎 Observation:\n" + observation)
+
+            # Feed observation back to the model
+            history.append({"role": "user", "content": f"Observation: {observation}"})
 
 if __name__ == "__main__":
-    while True:
-        user_query = input("💬 Your question (type 'exit' to quit): ")
-        if user_query.lower() in ['exit', 'quit']:
-            break
-        react_agent(user_query)
+    print("🔁 REACT Agent CLI — Ubuntu Tool Use with LLM Reasoning")
+    query = input("💬 What's your question for the agent? ")
+    run_react_loop(query)
