@@ -6,7 +6,7 @@ from langchain_community.tools.shell.tool import ShellTool
 class SafeShellTool(ShellTool):
     def _run(self, command: str, run_manager=None):
         #allowed = ["ls", "pwd", "whoami", "uname", "date", "uptime", "df", "free", "echo"]
-        disallowed = ["git", "rm", "mv", "chmod", "chown", "sudo", "curl", "wget", "ssh", "scp"]
+        disallowed = []#["git", "rm", "mv", "chmod", "chown", "sudo", "curl", "wget", "ssh", "scp"]
         if command.split()[0] in disallowed:
             return "❌ Command not allowed."
 
