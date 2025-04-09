@@ -34,6 +34,7 @@ def main():
         try:
             query = input("\n💬 Ask the agent: ")
             result = agent.run(query)
+            print("\nMemory Content:", memory.buffer)
             print("\n🧠 Final Answer:", result)
         except KeyboardInterrupt:
             print("\n👋 Exiting...")
